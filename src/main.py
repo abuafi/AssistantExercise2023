@@ -31,7 +31,7 @@ def get_parser(url:str) -> Optional[CourseParser]:
         return
     try:
         parser = parse_switch[domain]
-        return parser
+        return parser(url)
     except KeyError:
         warn(f"Domain name '{domain}' not supported")
         return
@@ -63,4 +63,7 @@ if __name__ == "__main__":
             parsers = [x for x in parsers if x is not None]
             results = list(executor.map(parse_url, parsers))
             results = [x for x in results if x is not None]
-            print(results)
+            # print(results)
+
+            for data in results:
+                print(f"{data['Teaching Staff']},{data['Description']}")
