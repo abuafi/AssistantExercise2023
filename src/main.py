@@ -1,36 +1,47 @@
 from urllib.parse import urlparse
+from typing import Optional
 from threading import Thread
 from queue import Queue
 from warnings import warn
+import sys
 
 from concurrent.futures import ThreadPoolExecutor
 
+from parsers.CourseParser import CourseParser
 from parsers.CourseParserUSI import CourseParserUSI
 
 parse_switch = {
     "search.usi.ch": CourseParserUSI
 }
 
-def parse_url(url:str) -> None:
+def get_parser(url:str) -> Optional[CourseParser]:
     domain = urlparse(url).netloc
+    if domain == "":
+        warn(f"Invalid url: '{url}'")
+        return
     try:
-        parser = parse_switch[domain](url)
-        return parser.parse_stats()
+        parser = parse_switch[domain]
+        return parser(url)
     except KeyError:
-        warn(f"Domain name {domain} not supported!")
+        warn(f"Domain name '{domain}' not supported")
+        return
+
+def parse_url(parser:CourseParser) -> dict:
+    return parser.parse_stats()
 
 if __name__ == "__main__":
-    urls = [
-    "https://search.usi.ch/en/courses/35265726/advanced-java-programming",
-    "https://studentservices.uzh.ch/uzh/anonym/vvz/index.html?sap-language=EN&sap-ui-language=EN#/details/2022/004/SM/51048814/50000003/Wirtschaftswissenschaftliche%2520Fakult%25C3%25A4t/50773260/Master%2520of%2520Science%2520UZH%2520in%2520Informatik%2520(RVO16)/50774406/Computing%2520and%2520Economics",
-    "https://search.usi.ch/en/courses/35265666/programming-styles",
-    "https://search.usi.ch/en/courses/352653/",
-    "https://search.usi.ch/en/courses/35265754/distributed-algorithms",
-    ]
+    
+    if len(sys.argv) < 2:
+        raise ValueError("Usage: python3 input.txt [#threads]")
 
-    dataqueue = Queue()
+    inputfile = sys.argv[1]
+    nthreads = int(sys.argv[2]) if len(sys.argv) > 2 else None
+    with open(inputfile) as input:
+        urls = input.readlines()
 
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(parse_url, urls))
-        results = [x for x in results if x is not None]
-        print(results)
+        with ThreadPoolExecutor(nthreads) if nthreads is not None else ThreadPoolExecutor() as executor:
+            parsers = [get_parser(url) for url in urls]
+            parsers = [x for x in parsers if x is not None]
+            results = list(executor.map(parse_url, parsers))
+            results = [x for x in results if x is not None]
+            print(results)
